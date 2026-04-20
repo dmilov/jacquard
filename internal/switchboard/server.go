@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/dmilov/jacquard/internal/models"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -15,13 +16,23 @@ var wsUpgrader = websocket.Upgrader{
 }
 
 type Server struct {
-	registry *Registry
-	db       *DB
-	nodeID   string
+	registry       *Registry
+	db             *DB
+	nodeID         string
+	launcher       *Launcher
+	switchboardURL string
+	dbPath         string
 }
 
-func NewServer(registry *Registry, db *DB, nodeID string) *Server {
-	return &Server{registry: registry, db: db, nodeID: nodeID}
+func NewServer(registry *Registry, db *DB, nodeID, switchboardURL, dbPath string, launcher *Launcher) *Server {
+	return &Server{
+		registry:       registry,
+		db:             db,
+		nodeID:         nodeID,
+		launcher:       launcher,
+		switchboardURL: switchboardURL,
+		dbPath:         dbPath,
+	}
 }
 
 func (s *Server) Handler(webFS http.FileSystem) http.Handler {
@@ -30,6 +41,8 @@ func (s *Server) Handler(webFS http.FileSystem) http.Handler {
 	// Loom lifecycle
 	mux.HandleFunc("POST /api/looms/register", s.handleRegister)
 	mux.HandleFunc("DELETE /api/looms/{id}", s.handleDeregister)
+	mux.HandleFunc("POST /api/looms/launch", s.handleLaunch)
+	mux.HandleFunc("POST /api/looms/{id}/kill", s.handleKill)
 
 	// Loom queries
 	mux.HandleFunc("GET /api/looms", s.handleListLooms)
@@ -64,6 +77,32 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeregister(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	s.registry.Deregister(id)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
+	var req models.LaunchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Command == "" {
+		http.Error(w, "command required", http.StatusBadRequest)
+		return
+	}
+	args := strings.Fields(req.Command)
+	name := req.Name
+	if name == "" {
+		name = req.Command
+	}
+	loomID := uuid.New().String()
+	if err := s.launcher.Launch(loomID, s.switchboardURL, name, s.dbPath, args); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"id": loomID})
+}
+
+func (s *Server) handleKill(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	s.launcher.Kill(id) // best-effort; false just means it wasn't launched by us
 	s.registry.Deregister(id)
 	w.WriteHeader(http.StatusOK)
 }

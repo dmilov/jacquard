@@ -24,6 +24,7 @@ func main() {
 	nodeID         := flag.String("node", hostname, "Node identifier")
 	dbPath         := flag.String("db", "jacquard.db", "SQLite database file path")
 	name           := flag.String("name", "", "Display name for this loom (defaults to command)")
+	idFlag         := flag.String("id", "", "Loom ID (generated if empty)")
 	flag.Parse()
 
 	args := flag.Args()
@@ -47,9 +48,12 @@ func main() {
 		log.Fatalf("migrate db: %v", err)
 	}
 
-	convID   := uuid.New().String()
-	loomID   := uuid.New().String()
-	command  := strings.Join(args, " ")
+	convID  := uuid.New().String()
+	loomID  := *idFlag
+	if loomID == "" {
+		loomID = uuid.New().String()
+	}
+	command := strings.Join(args, " ")
 	loomName := *name
 	if loomName == "" {
 		loomName = command

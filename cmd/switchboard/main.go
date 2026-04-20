@@ -3,10 +3,12 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	_ "modernc.org/sqlite"
 
@@ -36,9 +38,17 @@ func main() {
 		log.Fatalf("migrate db: %v", err)
 	}
 
+	// Derive switchboard's own base URL for looms to register back to.
+	host := *addr
+	if strings.HasPrefix(host, ":") {
+		host = "localhost" + host
+	}
+	switchboardURL := fmt.Sprintf("http://%s", host)
+
 	registry := switchboard.NewRegistry()
 	sdb      := switchboard.NewDB(db)
-	server   := switchboard.NewServer(registry, sdb, *nodeID)
+	launcher := switchboard.NewLauncher()
+	server   := switchboard.NewServer(registry, sdb, *nodeID, switchboardURL, *dbPath, launcher)
 	switchboard.StartHealthChecker(registry)
 
 	subFS, err := fs.Sub(jweb.FS, "periscope")

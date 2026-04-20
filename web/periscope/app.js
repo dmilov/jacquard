@@ -12,6 +12,9 @@ const convList    = document.getElementById('conv-list');
 const historyEl   = document.getElementById('history');
 const injectInput = document.getElementById('inject-input');
 const injectBtn   = document.getElementById('inject-btn');
+const launchCmd   = document.getElementById('launch-cmd');
+const launchName  = document.getElementById('launch-name');
+const launchBtn   = document.getElementById('launch-btn');
 const tabs        = document.querySelectorAll('.tab');
 const panels      = document.querySelectorAll('.panel');
 
@@ -85,6 +88,7 @@ async function loadLooms() {
         <span class="dot"></span>
         <span class="loom-label">${label}</span>
         <button class="rename-btn" title="Rename">✎</button>
+        <button class="kill-btn" title="Stop">✕</button>
       </div>
       <div class="meta">${escHtml(l.command)} · ${timeAgo(l.started_at)}</div>`;
     el.addEventListener('click', () => selectLoom(l, el));
@@ -99,6 +103,10 @@ async function loadLooms() {
           body: JSON.stringify({name: next.trim()}),
         }).then(() => loadLooms());
       }
+    });
+    el.querySelector('.kill-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      fetch(`/api/looms/${l.id}/kill`, {method: 'POST'}).then(() => loadLooms());
     });
     loomList.appendChild(el);
   });
@@ -220,6 +228,37 @@ function timeAgo(iso) {
 function fmtDate(iso) {
   return new Date(iso).toLocaleString();
 }
+
+// ── Launch ────────────────────────────────────────────────────────────────────
+async function launchLoom() {
+  const cmd = launchCmd.value.trim();
+  if (!cmd) return;
+  const name = launchName.value.trim();
+  launchBtn.disabled = true;
+  launchBtn.textContent = '…';
+  try {
+    const res = await fetch('/api/looms/launch', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({command: cmd, name}),
+    });
+    if (!res.ok) {
+      const msg = await res.text();
+      alert('Launch failed: ' + msg);
+      return;
+    }
+    launchCmd.value = '';
+    launchName.value = '';
+    // Give the loom a moment to register then refresh
+    setTimeout(loadLooms, 800);
+  } finally {
+    launchBtn.disabled = false;
+    launchBtn.textContent = 'Launch';
+  }
+}
+
+launchBtn.addEventListener('click', launchLoom);
+launchCmd.addEventListener('keydown', e => { if (e.key === 'Enter') launchLoom(); });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadLooms();

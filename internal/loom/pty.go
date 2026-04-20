@@ -23,9 +23,16 @@ func Run(args []string, injectCh <-chan string, resizeCh <-chan [2]int, inputTee
 	}
 	defer p.Close()
 
-	// Set PTY size to match the real terminal before the child starts.
-	if w, h, err := term.GetSize(int(os.Stdin.Fd())); err == nil && w > 0 {
-		p.Resize(w, h) //nolint:errcheck
+	// Headless mode: stdin is not a real terminal (e.g. launched by switchboard).
+	// Skip MakeRaw and local stdin forwarding; browser drives everything.
+	interactive := term.IsTerminal(int(os.Stdin.Fd()))
+
+	if interactive {
+		if w, h, err := term.GetSize(int(os.Stdin.Fd())); err == nil && w > 0 {
+			p.Resize(w, h) //nolint:errcheck
+		}
+	} else {
+		p.Resize(220, 50) //nolint:errcheck // sensible default until browser sends its size
 	}
 
 	cmd := p.Command(args[0], args[1:]...)
@@ -33,11 +40,13 @@ func Run(args []string, injectCh <-chan string, resizeCh <-chan [2]int, inputTee
 		return fmt.Errorf("pty.Start: %w", err)
 	}
 
-	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
-	if err != nil {
-		return fmt.Errorf("term.MakeRaw: %w", err)
+	if interactive {
+		oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+		if err != nil {
+			return fmt.Errorf("term.MakeRaw: %w", err)
+		}
+		defer term.Restore(int(os.Stdin.Fd()), oldState)
 	}
-	defer term.Restore(int(os.Stdin.Fd()), oldState)
 
 	// Apply resize requests from browser clients.
 	if resizeCh != nil {
@@ -48,14 +57,16 @@ func Run(args []string, injectCh <-chan string, resizeCh <-chan [2]int, inputTee
 		}()
 	}
 
-	// stdin → PTY (tee'd to recorder input side)
-	go func() {
-		dst := io.Writer(p)
-		if inputTee != nil {
-			dst = io.MultiWriter(p, inputTee)
-		}
-		io.Copy(dst, os.Stdin) //nolint:errcheck
-	}()
+	// stdin → PTY (tee'd to recorder input side); skipped in headless mode.
+	if interactive {
+		go func() {
+			dst := io.Writer(p)
+			if inputTee != nil {
+				dst = io.MultiWriter(p, inputTee)
+			}
+			io.Copy(dst, os.Stdin) //nolint:errcheck
+		}()
+	}
 
 	// injected messages → PTY
 	if injectCh != nil {

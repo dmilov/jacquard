@@ -48,6 +48,40 @@ header span { font-size: 0.75rem; color: #8b949e; }
   color: #8b949e;
 }
 
+.launch-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 10px 8px;
+  border-bottom: 1px solid #30363d;
+}
+
+.launch-bar input {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  padding: 5px 9px;
+  color: #e1e4e8;
+  font-size: 0.78rem;
+  outline: none;
+  width: 100%;
+}
+
+.launch-bar input:focus { border-color: #58a6ff; }
+
+.launch-bar button {
+  background: #238636;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 10px;
+  color: #fff;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.launch-bar button:hover { background: #2ea043; }
+
 .loom-list, .conv-list {
   flex: 1;
   overflow-y: auto;
@@ -96,8 +130,23 @@ header span { font-size: 0.75rem; color: #8b949e; }
   line-height: 1;
 }
 
-.loom-item:hover .rename-btn { opacity: 1; }
+.loom-item:hover .rename-btn,
+.loom-item:hover .kill-btn { opacity: 1; }
 .rename-btn:hover { color: #58a6ff; }
+
+.kill-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0 2px;
+  opacity: 0;
+  transition: opacity 0.1s;
+  line-height: 1;
+}
+.kill-btn:hover { color: #f85149; }
 
 .loom-item .meta, .conv-item .meta {
   font-size: 0.7rem;

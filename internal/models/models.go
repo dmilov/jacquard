@@ -40,3 +40,8 @@ type ResizeRequest struct {
 	Cols int `json:"cols"`
 	Rows int `json:"rows"`
 }
+
+type LaunchRequest struct {
+	Name    string `json:"name"`
+	Command string `json:"command"`
+}

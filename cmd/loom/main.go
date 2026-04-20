@@ -85,7 +85,17 @@ func main() {
 	)
 	inputTee := writerFunc(recorder.WriteInput)
 
-	if err := loom.Run(args, agent.InjectCh(), agent.ResizeCh(), inputTee, outputTee); err != nil {
+	// Intercept inject channel so web-injected messages are also recorded.
+	injectCh := make(chan string, 16)
+	go func() {
+		defer close(injectCh)
+		for msg := range agent.InjectCh() {
+			recorder.WriteInput([]byte(msg + "\r"))
+			injectCh <- msg
+		}
+	}()
+
+	if err := loom.Run(args, injectCh, agent.ResizeCh(), inputTee, outputTee); err != nil {
 		log.Printf("process exited: %v", err)
 	}
 

@@ -171,28 +171,39 @@ async function loadHistory(convId) {
 // ── Conversations ─────────────────────────────────────────────────────────────
 async function loadConversations() {
   const convs = await api('/api/conversations').catch(() => []);
+  const mainPanel = document.getElementById('conv-list-main');
   convList.innerHTML = '';
+  mainPanel.innerHTML = '';
+
   if (!convs.length) {
     convList.innerHTML = '<div class="empty">No conversations</div>';
+    mainPanel.innerHTML = '<div class="empty">No conversations yet</div>';
     return;
   }
+
   convs.forEach(c => {
-    const el = document.createElement('div');
-    el.className = 'conv-item' + (c.id === activeConvId ? ' active' : '');
-    el.innerHTML = `
-      <div class="cmd">${escHtml(c.command)}</div>
-      <div class="meta">${c.id.slice(0, 8)} · ${fmtDate(c.started_at)}</div>`;
-    el.addEventListener('click', () => {
-      document.querySelectorAll('.conv-item').forEach(e => e.classList.remove('active'));
-      el.classList.add('active');
-      activeConvId = c.id;
-      loadHistory(c.id);
-      tabs.forEach(t => t.classList.remove('active'));
-      panels.forEach(p => p.classList.remove('active'));
-      document.querySelector('[data-panel="history"]').classList.add('active');
-      document.getElementById('panel-history').classList.add('active');
-    });
-    convList.appendChild(el);
+    const makeItem = () => {
+      const el = document.createElement('div');
+      el.className = 'conv-item' + (c.id === activeConvId ? ' active' : '');
+      const status = !c.ended_at ? '<span class="dot"></span>' : '';
+      el.innerHTML = `
+        <div class="cmd">${status}${escHtml(c.name || c.command)}</div>
+        <div class="meta">${c.id.slice(0, 8)} · ${fmtDate(c.started_at)}</div>`;
+      el.addEventListener('click', () => {
+        document.querySelectorAll('.conv-item').forEach(e => e.classList.remove('active'));
+        document.querySelectorAll(`.conv-item[data-conv="${c.id}"]`).forEach(e => e.classList.add('active'));
+        activeConvId = c.id;
+        loadHistory(c.id);
+        tabs.forEach(t => t.classList.remove('active'));
+        panels.forEach(p => p.classList.remove('active'));
+        document.querySelector('[data-panel="history"]').classList.add('active');
+        document.getElementById('panel-history').classList.add('active');
+      });
+      el.dataset.conv = c.id;
+      return el;
+    };
+    convList.appendChild(makeItem());
+    mainPanel.appendChild(makeItem());
   });
 }
 
@@ -212,4 +223,5 @@ function fmtDate(iso) {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadLooms();
-setInterval(loadLooms, 5000);
+loadConversations();
+setInterval(() => { loadLooms(); loadConversations(); }, 5000);

@@ -12,14 +12,14 @@ Named after the [Jacquard loom](https://en.wikipedia.org/wiki/Jacquard_machine) 
 *Per CLI process.* Wraps a Claude or Copilot CLI process in a PTY, providing full transparent terminal passthrough while intercepting I/O. Records the conversation to MySQL and exposes live output over WebSocket. Registers itself with the local Switchboard on startup.
 
 ```
-loom -switchboard http://localhost:8080 -dsn "user:pass@tcp(localhost:3306)/jacquard?parseTime=true" -- claude
+loom -switchboard http://localhost:8080 -db jacquard.db -- claude
 ```
 
 ### Switchboard
 *Per machine (node).* Maintains a registry of all active Loom instances on the node. Exposes an HTTP API for remote clients to list looms, inject messages, stream live output, and query conversation history. Also serves the Periscope web UI.
 
 ```
-switchboard -addr :8080 -dsn "user:pass@tcp(localhost:3306)/jacquard?parseTime=true"
+switchboard -addr :8080 -db jacquard.db
 ```
 
 ### Periscope
@@ -35,7 +35,7 @@ Open `http://localhost:8080` after starting Switchboard.
 Browser (Periscope)
        │  HTTP / WebSocket
        ▼
-  Switchboard  ──── MySQL (conversations, messages)
+  Switchboard  ──── SQLite (conversations, messages)
        │  HTTP / WebSocket proxy
        ▼
     Loom(s)
@@ -53,17 +53,10 @@ Browser (Periscope)
 
 ### Prerequisites
 - Go 1.22+
-- MySQL 8+
-
-### Database
-```sql
--- Run schema/schema.sql
-mysql -u root -p < schema/schema.sql
-```
 
 ### Build
 ```bash
-go build -o bin/loom     ./cmd/loom
+go build -o bin/loom        ./cmd/loom
 go build -o bin/switchboard ./cmd/switchboard
 ```
 
@@ -71,12 +64,13 @@ go build -o bin/switchboard ./cmd/switchboard
 
 **1. Start Switchboard** (once per machine):
 ```bash
-./bin/switchboard -dsn "user:pass@tcp(localhost:3306)/jacquard?parseTime=true"
+./bin/switchboard -db jacquard.db
 ```
+The database file is created automatically on first run. No setup needed.
 
 **2. Launch a CLI session through Loom** (instead of calling it directly):
 ```bash
-./bin/loom -dsn "user:pass@tcp(localhost:3306)/jacquard?parseTime=true" -- claude
+./bin/loom -db jacquard.db -- claude
 ```
 The terminal behaves exactly as if you ran `claude` directly. Loom is transparent.
 
@@ -96,8 +90,6 @@ The terminal behaves exactly as if you ran `claude` directly. Loom is transparen
 
 ---
 
-## DSN Format
+## Database
 
-```
-user:password@tcp(host:port)/jacquard?parseTime=true
-```
+Both binaries share the same SQLite file via the `-db` flag (default: `jacquard.db` in the current directory). The schema is applied automatically on startup — no manual setup required.

@@ -16,7 +16,7 @@ func NewDB(db *sql.DB) *DB { return &DB{db: db} }
 
 func (d *DB) SaveConversation(ctx context.Context, conv models.Conversation) error {
 	_, err := d.db.ExecContext(ctx,
-		`INSERT IGNORE INTO conversations (id, node_id, command, started_at) VALUES (?, ?, ?, ?)`,
+		`INSERT OR IGNORE INTO conversations (id, node_id, command, started_at) VALUES (?, ?, ?, ?)`,
 		conv.ID, conv.NodeID, conv.Command, conv.StartedAt,
 	)
 	return err

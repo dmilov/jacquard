@@ -44,4 +44,5 @@ type ResizeRequest struct {
 type LaunchRequest struct {
 	Name    string `json:"name"`
 	Command string `json:"command"`
+	WorkDir string `json:"work_dir"`
 }

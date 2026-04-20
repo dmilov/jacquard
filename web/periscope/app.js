@@ -12,9 +12,10 @@ const convList    = document.getElementById('conv-list');
 const historyEl   = document.getElementById('history');
 const injectInput = document.getElementById('inject-input');
 const injectBtn   = document.getElementById('inject-btn');
-const launchCmd   = document.getElementById('launch-cmd');
-const launchName  = document.getElementById('launch-name');
-const launchBtn   = document.getElementById('launch-btn');
+const launchCmd     = document.getElementById('launch-cmd');
+const launchName    = document.getElementById('launch-name');
+const launchWorkdir = document.getElementById('launch-workdir');
+const launchBtn     = document.getElementById('launch-btn');
 const tabs        = document.querySelectorAll('.tab');
 const panels      = document.querySelectorAll('.panel');
 
@@ -248,14 +249,15 @@ function fmtDate(iso) {
 async function launchLoom() {
   const cmd = launchCmd.value.trim();
   if (!cmd) return;
-  const name = launchName.value.trim();
+  const name    = launchName.value.trim();
+  const workDir = launchWorkdir.value.trim();
   launchBtn.disabled = true;
   launchBtn.textContent = '…';
   try {
     const res = await fetch('/api/looms/launch', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({command: cmd, name}),
+      body: JSON.stringify({command: cmd, name, work_dir: workDir}),
     });
     if (!res.ok) {
       const msg = await res.text();
@@ -264,6 +266,7 @@ async function launchLoom() {
     }
     launchCmd.value = '';
     launchName.value = '';
+    launchWorkdir.value = '';
     // Give the loom a moment to register then refresh
     setTimeout(loadLooms, 800);
   } finally {

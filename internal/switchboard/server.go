@@ -93,7 +93,7 @@ func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
 		name = req.Command
 	}
 	loomID := uuid.New().String()
-	if err := s.launcher.Launch(loomID, s.switchboardURL, name, s.dbPath, args); err != nil {
+	if err := s.launcher.Launch(loomID, s.switchboardURL, name, s.dbPath, req.WorkDir, args); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

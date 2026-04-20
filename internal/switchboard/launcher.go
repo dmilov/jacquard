@@ -30,12 +30,19 @@ func NewLauncher() *Launcher {
 
 // Launch starts loom as a headless subprocess. dbPath should match the
 // switchboard's own database so both share the same conversation records.
-func (l *Launcher) Launch(loomID, switchboardURL, name, dbPath string, args []string) error {
+// workDir sets the child's working directory; empty means inherit switchboard's cwd.
+func (l *Launcher) Launch(loomID, switchboardURL, name, dbPath, workDir string, args []string) error {
+	// Convert dbPath to absolute so it resolves correctly in any working dir.
+	absDB, err := filepath.Abs(dbPath)
+	if err != nil {
+		absDB = dbPath
+	}
+
 	loomArgs := []string{
 		"-id", loomID,
 		"-switchboard", switchboardURL,
 		"-name", name,
-		"-db", dbPath,
+		"-db", absDB,
 		"--",
 	}
 	loomArgs = append(loomArgs, args...)
@@ -44,6 +51,9 @@ func (l *Launcher) Launch(loomID, switchboardURL, name, dbPath string, args []st
 	cmd.Stdin = nil        // headless — no local terminal
 	cmd.Stdout = nil       // PTY output goes to WebSocket, not here
 	cmd.Stderr = os.Stderr // log lines visible in switchboard console
+	if workDir != "" {
+		cmd.Dir = workDir
+	}
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("exec loom: %w", err)

@@ -22,6 +22,49 @@ header {
 header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: 0.05em; color: #58a6ff; }
 header span { font-size: 0.75rem; color: #8b949e; }
 
+.node-bar {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.node-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8b949e;
+}
+
+.node-bar input {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  padding: 4px 10px;
+  color: #e1e4e8;
+  font-size: 0.78rem;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  width: 220px;
+  outline: none;
+}
+
+.node-bar input:focus { border-color: #58a6ff; }
+
+.node-bar button {
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  color: #8b949e;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition: all 0.1s;
+}
+
+.node-bar button:hover { border-color: #58a6ff; color: #58a6ff; }
+
 .layout {
   display: flex;
   flex: 1;

@@ -35,6 +35,19 @@ func NewServer(registry *Registry, db *DB, nodeID, switchboardURL, dbPath string
 	}
 }
 
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *Server) Handler(webFS http.FileSystem) http.Handler {
 	mux := http.NewServeMux()
 
@@ -57,7 +70,7 @@ func (s *Server) Handler(webFS http.FileSystem) http.Handler {
 	// Periscope web UI
 	mux.Handle("/", http.FileServer(webFS))
 
-	return mux
+	return corsMiddleware(mux)
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

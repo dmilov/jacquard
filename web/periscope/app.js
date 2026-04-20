@@ -1,4 +1,7 @@
-const api = path => fetch(path).then(r => r.json());
+// ── Node (Switchboard) connection ─────────────────────────────────────────────
+let switchboardURL = localStorage.getItem('jacquard:node') || location.origin;
+
+const api = path => fetch(switchboardURL + path).then(r => r.json());
 
 let activeLoomId = null;
 let activeConvId = null;
@@ -7,17 +10,19 @@ let term = null;
 let fitAddon = null;
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
-const loomList    = document.getElementById('loom-list');
-const convList    = document.getElementById('conv-list');
-const historyEl   = document.getElementById('history');
-const injectInput = document.getElementById('inject-input');
-const injectBtn   = document.getElementById('inject-btn');
+const loomList      = document.getElementById('loom-list');
+const convList      = document.getElementById('conv-list');
+const historyEl     = document.getElementById('history');
+const injectInput   = document.getElementById('inject-input');
+const injectBtn     = document.getElementById('inject-btn');
 const launchCmd     = document.getElementById('launch-cmd');
 const launchName    = document.getElementById('launch-name');
 const launchWorkdir = document.getElementById('launch-workdir');
 const launchBtn     = document.getElementById('launch-btn');
-const tabs        = document.querySelectorAll('.tab');
-const panels      = document.querySelectorAll('.panel');
+const nodeUrlInput  = document.getElementById('node-url');
+const nodeConnect   = document.getElementById('node-connect');
+const tabs          = document.querySelectorAll('.tab');
+const panels        = document.querySelectorAll('.panel');
 
 // ── xterm.js terminal ─────────────────────────────────────────────────────────
 function initTerminal() {
@@ -107,7 +112,7 @@ async function loadLooms() {
       const cur = l.name || l.command;
       const next = prompt('Rename loom:', cur);
       if (next && next.trim() && next.trim() !== cur) {
-        fetch(`/api/looms/${l.id}`, {
+        fetch(`${switchboardURL}/api/looms/${l.id}`, {
           method: 'PATCH',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({name: next.trim()}),
@@ -116,7 +121,7 @@ async function loadLooms() {
     });
     el.querySelector('.kill-btn').addEventListener('click', e => {
       e.stopPropagation();
-      fetch(`/api/looms/${l.id}/kill`, {method: 'POST'}).then(() => loadLooms());
+      fetch(`${switchboardURL}/api/looms/${l.id}/kill`, {method: 'POST'}).then(() => loadLooms());
     });
     loomList.appendChild(el);
   });
@@ -141,7 +146,7 @@ function connectLive(loomId) {
   if (liveSocket) liveSocket.close();
   initTerminal();
 
-  const wsUrl = `ws://${location.host}/api/looms/${loomId}/ws`;
+  const wsUrl = switchboardURL.replace(/^http/, 'ws') + `/api/looms/${loomId}/ws`;
   liveSocket = new WebSocket(wsUrl);
   liveSocket.binaryType = 'arraybuffer';
 
@@ -168,7 +173,7 @@ async function sendInject() {
   const msg = injectInput.value.trim();
   if (!msg || !activeLoomId) return;
   injectInput.value = '';
-  await fetch(`/api/looms/${activeLoomId}/inject`, {
+  await fetch(`${switchboardURL}/api/looms/${activeLoomId}/inject`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({message: msg}),
@@ -254,7 +259,7 @@ async function launchLoom() {
   launchBtn.disabled = true;
   launchBtn.textContent = '…';
   try {
-    const res = await fetch('/api/looms/launch', {
+    const res = await fetch(`${switchboardURL}/api/looms/launch`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({command: cmd, name, work_dir: workDir}),
@@ -277,6 +282,41 @@ async function launchLoom() {
 
 launchBtn.addEventListener('click', launchLoom);
 launchCmd.addEventListener('keydown', e => { if (e.key === 'Enter') launchLoom(); });
+
+// ── Node selector ─────────────────────────────────────────────────────────────
+function connectNode(raw) {
+  let url = raw.trim().replace(/\/$/, '');
+  if (!url) return;
+  if (!/^https?:\/\//.test(url)) url = 'http://' + url;
+  switchboardURL = url;
+  localStorage.setItem('jacquard:node', url);
+
+  // Persist to recent list (datalist autocomplete).
+  const nodes = JSON.parse(localStorage.getItem('jacquard:nodes') || '[]');
+  const updated = [url, ...nodes.filter(n => n !== url)].slice(0, 10);
+  localStorage.setItem('jacquard:nodes', JSON.stringify(updated));
+  renderNodeList(updated);
+  nodeUrlInput.value = url;
+
+  // Reset active state and reload from the new node.
+  if (liveSocket) { liveSocket.close(); liveSocket = null; }
+  activeLoomId = null;
+  activeConvId = null;
+  initTerminal();
+  loadLooms();
+  loadConversations();
+}
+
+function renderNodeList(nodes) {
+  const dl = document.getElementById('node-list');
+  dl.innerHTML = nodes.map(n => `<option value="${escHtml(n)}">`).join('');
+}
+
+// Initialise node input from saved state.
+nodeUrlInput.value = switchboardURL;
+renderNodeList(JSON.parse(localStorage.getItem('jacquard:nodes') || '[]'));
+nodeConnect.addEventListener('click', () => connectNode(nodeUrlInput.value));
+nodeUrlInput.addEventListener('keydown', e => { if (e.key === 'Enter') connectNode(nodeUrlInput.value); });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadLooms();

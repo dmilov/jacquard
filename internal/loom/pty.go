@@ -15,11 +15,19 @@ import (
 // injectCh delivers messages to write to the PTY as if the user typed them.
 // Blocks until the child process exits.
 func Run(args []string, injectCh <-chan string, inputTee io.Writer, outputTee io.Writer) error {
+	enableVTOutput() // Windows: ensure ANSI sequences render in parent console
+
 	p, err := gopty.New()
 	if err != nil {
 		return fmt.Errorf("pty.New: %w", err)
 	}
 	defer p.Close()
+
+	// Set PTY size to match the real terminal before the child starts,
+	// so it never renders for the wrong dimensions.
+	if w, h, err := term.GetSize(int(os.Stdin.Fd())); err == nil && w > 0 {
+		p.Resize(w, h) //nolint:errcheck
+	}
 
 	cmd := p.Command(args[0], args[1:]...)
 	if err := cmd.Start(); err != nil {

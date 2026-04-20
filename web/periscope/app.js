@@ -3,16 +3,42 @@ const api = path => fetch(path).then(r => r.json());
 let activeLoomId = null;
 let activeConvId = null;
 let liveSocket = null;
+let term = null;
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
-const loomList   = document.getElementById('loom-list');
-const convList   = document.getElementById('conv-list');
-const outputEl   = document.getElementById('output');
-const historyEl  = document.getElementById('history');
+const loomList    = document.getElementById('loom-list');
+const convList    = document.getElementById('conv-list');
+const historyEl   = document.getElementById('history');
 const injectInput = document.getElementById('inject-input');
-const injectBtn  = document.getElementById('inject-btn');
-const tabs       = document.querySelectorAll('.tab');
-const panels     = document.querySelectorAll('.panel');
+const injectBtn   = document.getElementById('inject-btn');
+const tabs        = document.querySelectorAll('.tab');
+const panels      = document.querySelectorAll('.panel');
+
+// ── xterm.js terminal ─────────────────────────────────────────────────────────
+function initTerminal() {
+  if (term) {
+    term.dispose();
+  }
+  term = new Terminal({
+    theme: {
+      background: '#0d1117',
+      foreground: '#e1e4e8',
+      cursor:     '#58a6ff',
+      selection:  'rgba(88,166,255,0.3)',
+    },
+    fontFamily: "'Cascadia Code', 'Fira Code', 'Consolas', monospace",
+    fontSize: 13,
+    lineHeight: 1.4,
+    convertEol: true,
+    scrollback: 5000,
+  });
+  const container = document.getElementById('terminal-container');
+  container.innerHTML = '';
+  term.open(container);
+  term.writeln('\x1b[2m— waiting for loom —\x1b[0m');
+}
+
+initTerminal();
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 tabs.forEach(tab => {
@@ -23,6 +49,7 @@ tabs.forEach(tab => {
     document.getElementById('panel-' + tab.dataset.panel).classList.add('active');
     if (tab.dataset.panel === 'history' && activeConvId) loadHistory(activeConvId);
     if (tab.dataset.panel === 'conversations') loadConversations();
+    if (tab.dataset.panel === 'live') term && term.focus();
   });
 });
 
@@ -40,42 +67,40 @@ async function loadLooms() {
     el.innerHTML = `
       <div class="cmd"><span class="dot"></span>${escHtml(l.command)}</div>
       <div class="meta">${l.id.slice(0, 8)} · ${timeAgo(l.started_at)}</div>`;
-    el.addEventListener('click', () => selectLoom(l));
+    el.addEventListener('click', () => selectLoom(l, el));
     loomList.appendChild(el);
   });
 }
 
-function selectLoom(l) {
+function selectLoom(l, el) {
   activeLoomId = l.id;
   activeConvId = l.conversation_id;
-  document.querySelectorAll('.loom-item').forEach(el => el.classList.remove('active'));
-  event.currentTarget.classList.add('active');
+  document.querySelectorAll('.loom-item').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
   connectLive(l.id);
-  // Switch to live tab
   tabs.forEach(t => t.classList.remove('active'));
   panels.forEach(p => p.classList.remove('active'));
   document.querySelector('[data-panel="live"]').classList.add('active');
   document.getElementById('panel-live').classList.add('active');
 }
 
-// ── Live output ───────────────────────────────────────────────────────────────
+// ── Live output via xterm.js ──────────────────────────────────────────────────
 function connectLive(loomId) {
   if (liveSocket) liveSocket.close();
-  outputEl.textContent = '';
+  initTerminal();
+
   const wsUrl = `ws://${location.host}/api/looms/${loomId}/ws`;
   liveSocket = new WebSocket(wsUrl);
   liveSocket.binaryType = 'arraybuffer';
+
   liveSocket.onmessage = e => {
-    const text = new TextDecoder().decode(e.data);
-    outputEl.textContent += text;
-    outputEl.scrollTop = outputEl.scrollHeight;
+    const data = e.data instanceof ArrayBuffer
+      ? new Uint8Array(e.data)
+      : e.data;
+    term.write(data);
   };
-  liveSocket.onerror = () => {
-    outputEl.textContent += '\n[connection error]\n';
-  };
-  liveSocket.onclose = () => {
-    outputEl.textContent += '\n[disconnected]\n';
-  };
+  liveSocket.onerror = () => term.writeln('\r\n\x1b[31m[connection error]\x1b[0m');
+  liveSocket.onclose = () => term.writeln('\r\n\x1b[2m[disconnected]\x1b[0m');
 }
 
 // ── Inject ────────────────────────────────────────────────────────────────────
@@ -129,7 +154,6 @@ async function loadConversations() {
       el.classList.add('active');
       activeConvId = c.id;
       loadHistory(c.id);
-      // Switch to history tab
       tabs.forEach(t => t.classList.remove('active'));
       panels.forEach(p => p.classList.remove('active'));
       document.querySelector('[data-panel="history"]').classList.add('active');
@@ -143,14 +167,12 @@ async function loadConversations() {
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-
 function timeAgo(iso) {
   const d = Math.floor((Date.now() - new Date(iso)) / 1000);
   if (d < 60) return `${d}s ago`;
   if (d < 3600) return `${Math.floor(d/60)}m ago`;
   return `${Math.floor(d/3600)}h ago`;
 }
-
 function fmtDate(iso) {
   return new Date(iso).toLocaleString();
 }

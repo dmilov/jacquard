@@ -7,3 +7,4 @@ vendor/
 *.db
 *.db-shm
 *.db-wal
+web/periscope/*.map

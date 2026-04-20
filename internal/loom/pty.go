@@ -1,12 +1,12 @@
 package loom
 
 import (
+	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"time"
 
-	"github.com/creack/pty"
+	gopty "github.com/aymanbagabas/go-pty"
 	"golang.org/x/term"
 )
 
@@ -15,27 +15,30 @@ import (
 // injectCh delivers messages to write to the PTY as if the user typed them.
 // Blocks until the child process exits.
 func Run(args []string, injectCh <-chan string, inputTee io.Writer, outputTee io.Writer) error {
-	cmd := exec.Command(args[0], args[1:]...)
-
-	ptmx, err := pty.Start(cmd)
+	p, err := gopty.New()
 	if err != nil {
-		return err
+		return fmt.Errorf("pty.New: %w", err)
 	}
-	defer ptmx.Close()
+	defer p.Close()
+
+	cmd := p.Command(args[0], args[1:]...)
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("pty.Start: %w", err)
+	}
 
 	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
-		return err
+		return fmt.Errorf("term.MakeRaw: %w", err)
 	}
 	defer term.Restore(int(os.Stdin.Fd()), oldState)
 
-	go pollResize(ptmx)
+	go pollResize(p)
 
 	// stdin → PTY (tee'd to recorder input side)
 	go func() {
-		dst := io.Writer(ptmx)
+		dst := io.Writer(p)
 		if inputTee != nil {
-			dst = io.MultiWriter(ptmx, inputTee)
+			dst = io.MultiWriter(p, inputTee)
 		}
 		io.Copy(dst, os.Stdin) //nolint:errcheck
 	}()
@@ -44,7 +47,7 @@ func Run(args []string, injectCh <-chan string, inputTee io.Writer, outputTee io
 	if injectCh != nil {
 		go func() {
 			for msg := range injectCh {
-				ptmx.WriteString(msg + "\r") //nolint:errcheck
+				p.Write([]byte(msg + "\r")) //nolint:errcheck
 			}
 		}()
 	}
@@ -54,17 +57,17 @@ func Run(args []string, injectCh <-chan string, inputTee io.Writer, outputTee io
 	if outputTee != nil {
 		dst = io.MultiWriter(os.Stdout, outputTee)
 	}
-	io.Copy(dst, ptmx) //nolint:errcheck
+	io.Copy(dst, p) //nolint:errcheck
 
 	return cmd.Wait()
 }
 
-func pollResize(ptmx *os.File) {
+func pollResize(p gopty.Pty) {
 	var lastW, lastH int
 	for {
 		w, h, err := term.GetSize(int(os.Stdin.Fd()))
 		if err == nil && (w != lastW || h != lastH) {
-			_ = pty.Setsize(ptmx, &pty.Winsize{Rows: uint16(h), Cols: uint16(w)})
+			p.Resize(w, h) //nolint:errcheck
 			lastW, lastH = w, h
 		}
 		time.Sleep(250 * time.Millisecond)

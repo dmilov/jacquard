@@ -20,7 +20,7 @@ import (
 func main() {
 	hostname, _ := os.Hostname()
 
-	switchboardURL := flag.String("switchboard", "http://localhost:8080", "Switchboard URL")
+	switchboardURL := flag.String("switchboard", "http://localhost:1804", "Switchboard URL")
 	nodeID         := flag.String("node", hostname, "Node identifier")
 	dbPath         := flag.String("db", "jacquard.db", "SQLite database file path")
 	flag.Parse()

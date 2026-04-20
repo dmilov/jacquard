@@ -79,7 +79,7 @@ func main() {
 	)
 	inputTee := writerFunc(recorder.WriteInput)
 
-	if err := loom.Run(args, agent.InjectCh(), inputTee, outputTee); err != nil {
+	if err := loom.Run(args, agent.InjectCh(), agent.ResizeCh(), inputTee, outputTee); err != nil {
 		log.Printf("process exited: %v", err)
 	}
 

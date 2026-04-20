@@ -4,6 +4,7 @@ let activeLoomId = null;
 let activeConvId = null;
 let liveSocket = null;
 let term = null;
+let fitAddon = null;
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const loomList    = document.getElementById('loom-list');
@@ -19,6 +20,7 @@ function initTerminal() {
   if (term) {
     term.dispose();
   }
+  fitAddon = new FitAddon.FitAddon();
   term = new Terminal({
     theme: {
       background: '#0d1117',
@@ -32,11 +34,24 @@ function initTerminal() {
     convertEol: true,
     scrollback: 5000,
   });
+  term.loadAddon(fitAddon);
   const container = document.getElementById('terminal-container');
   container.innerHTML = '';
   term.open(container);
+  fitAddon.fit();
   term.writeln('\x1b[2m— waiting for loom —\x1b[0m');
 }
+
+function sendResize() {
+  if (liveSocket && liveSocket.readyState === WebSocket.OPEN && term) {
+    liveSocket.send(JSON.stringify({type: 'resize', cols: term.cols, rows: term.rows}));
+  }
+}
+
+window.addEventListener('resize', () => {
+  if (fitAddon) fitAddon.fit();
+  sendResize();
+});
 
 initTerminal();
 
@@ -93,6 +108,7 @@ function connectLive(loomId) {
   liveSocket = new WebSocket(wsUrl);
   liveSocket.binaryType = 'arraybuffer';
 
+  liveSocket.onopen = () => sendResize();
   liveSocket.onmessage = e => {
     const data = e.data instanceof ArrayBuffer
       ? new Uint8Array(e.data)

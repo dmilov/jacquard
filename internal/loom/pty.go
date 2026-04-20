@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"time"
 
 	gopty "github.com/aymanbagabas/go-pty"
 	"golang.org/x/term"
@@ -13,8 +12,9 @@ import (
 // Run spawns args in a PTY with full terminal passthrough. inputTee receives
 // every byte the user types; outputTee receives every byte the CLI outputs.
 // injectCh delivers messages to write to the PTY as if the user typed them.
+// resizeCh delivers {cols, rows} pairs from browser clients.
 // Blocks until the child process exits.
-func Run(args []string, injectCh <-chan string, inputTee io.Writer, outputTee io.Writer) error {
+func Run(args []string, injectCh <-chan string, resizeCh <-chan [2]int, inputTee io.Writer, outputTee io.Writer) error {
 	enableVTOutput() // Windows: ensure ANSI sequences render in parent console
 
 	p, err := gopty.New()
@@ -23,8 +23,7 @@ func Run(args []string, injectCh <-chan string, inputTee io.Writer, outputTee io
 	}
 	defer p.Close()
 
-	// Set PTY size to match the real terminal before the child starts,
-	// so it never renders for the wrong dimensions.
+	// Set PTY size to match the real terminal before the child starts.
 	if w, h, err := term.GetSize(int(os.Stdin.Fd())); err == nil && w > 0 {
 		p.Resize(w, h) //nolint:errcheck
 	}
@@ -40,7 +39,14 @@ func Run(args []string, injectCh <-chan string, inputTee io.Writer, outputTee io
 	}
 	defer term.Restore(int(os.Stdin.Fd()), oldState)
 
-	go pollResize(p)
+	// Apply resize requests from browser clients.
+	if resizeCh != nil {
+		go func() {
+			for dim := range resizeCh {
+				p.Resize(dim[0], dim[1]) //nolint:errcheck
+			}
+		}()
+	}
 
 	// stdin → PTY (tee'd to recorder input side)
 	go func() {
@@ -70,14 +76,3 @@ func Run(args []string, injectCh <-chan string, inputTee io.Writer, outputTee io
 	return cmd.Wait()
 }
 
-func pollResize(p gopty.Pty) {
-	var lastW, lastH int
-	for {
-		w, h, err := term.GetSize(int(os.Stdin.Fd()))
-		if err == nil && (w != lastW || h != lastH) {
-			p.Resize(w, h) //nolint:errcheck
-			lastW, lastH = w, h
-		}
-		time.Sleep(250 * time.Millisecond)
-	}
-}

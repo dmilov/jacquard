@@ -34,3 +34,8 @@ type RegisterRequest struct {
 type InjectRequest struct {
 	Message string `json:"message"`
 }
+
+type ResizeRequest struct {
+	Cols int `json:"cols"`
+	Rows int `json:"rows"`
+}

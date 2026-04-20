@@ -24,6 +24,7 @@ type Agent struct {
 	switchboard string
 	broadcaster *Broadcaster
 	injectCh    chan string
+	resizeCh    chan [2]int
 	server      *http.Server
 }
 
@@ -33,11 +34,13 @@ func NewAgent(info models.LoomInfo, switchboardURL string) *Agent {
 		switchboard: switchboardURL,
 		broadcaster: NewBroadcaster(),
 		injectCh:    make(chan string, 16),
+		resizeCh:    make(chan [2]int, 4),
 	}
 }
 
 func (a *Agent) Broadcaster() *Broadcaster { return a.broadcaster }
 func (a *Agent) InjectCh() <-chan string    { return a.injectCh }
+func (a *Agent) ResizeCh() <-chan [2]int    { return a.resizeCh }
 
 // Start binds to a random local port, starts the HTTP server, and registers
 // with the Switchboard.
@@ -64,6 +67,7 @@ func (a *Agent) Start() error {
 func (a *Agent) Shutdown() {
 	a.deregister()
 	close(a.injectCh)
+	close(a.resizeCh)
 	a.broadcaster.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -111,6 +115,27 @@ func (a *Agent) handleWS(w http.ResponseWriter, r *http.Request) {
 
 	ch := a.broadcaster.Subscribe()
 	defer a.broadcaster.Unsubscribe(ch)
+
+	// Read resize messages sent by the browser through the switchboard proxy.
+	go func() {
+		for {
+			msgType, data, err := conn.ReadMessage()
+			if err != nil {
+				return
+			}
+			if msgType != websocket.TextMessage {
+				continue
+			}
+			var req models.ResizeRequest
+			if err := json.Unmarshal(data, &req); err != nil || req.Cols <= 0 || req.Rows <= 0 {
+				continue
+			}
+			select {
+			case a.resizeCh <- [2]int{req.Cols, req.Rows}:
+			default:
+			}
+		}
+	}()
 
 	done := r.Context().Done()
 	for {

@@ -70,10 +70,34 @@ header span { font-size: 0.75rem; color: #8b949e; }
 .loom-item .cmd {
   font-size: 0.8rem;
   font-family: 'Cascadia Code', 'Fira Code', monospace;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.loom-label {
+  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.rename-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0 2px;
+  opacity: 0;
+  transition: opacity 0.1s;
+  line-height: 1;
+}
+
+.loom-item:hover .rename-btn { opacity: 1; }
+.rename-btn:hover { color: #58a6ff; }
 
 .loom-item .meta, .conv-item .meta {
   font-size: 0.7rem;

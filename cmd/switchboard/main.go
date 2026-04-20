@@ -39,6 +39,7 @@ func main() {
 	registry := switchboard.NewRegistry()
 	sdb      := switchboard.NewDB(db)
 	server   := switchboard.NewServer(registry, sdb, *nodeID)
+	switchboard.StartHealthChecker(registry)
 
 	subFS, err := fs.Sub(jweb.FS, "periscope")
 	if err != nil {

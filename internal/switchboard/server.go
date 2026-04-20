@@ -33,6 +33,7 @@ func (s *Server) Handler(webFS http.FileSystem) http.Handler {
 
 	// Loom queries
 	mux.HandleFunc("GET /api/looms", s.handleListLooms)
+	mux.HandleFunc("PATCH /api/looms/{id}", s.handleRename)
 	mux.HandleFunc("POST /api/looms/{id}/inject", s.handleInject)
 	mux.HandleFunc("GET /api/looms/{id}/ws", s.handleProxyWS)
 
@@ -69,6 +70,21 @@ func (s *Server) handleDeregister(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleListLooms(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.registry.List())
+}
+
+func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if !s.registry.Rename(r.PathValue("id"), req.Name) {
+		http.Error(w, "loom not found", http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleInject(w http.ResponseWriter, r *http.Request) {

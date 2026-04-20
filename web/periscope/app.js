@@ -79,10 +79,27 @@ async function loadLooms() {
   looms.forEach(l => {
     const el = document.createElement('div');
     el.className = 'loom-item' + (l.id === activeLoomId ? ' active' : '');
+    const label = escHtml(l.name || l.command);
     el.innerHTML = `
-      <div class="cmd"><span class="dot"></span>${escHtml(l.command)}</div>
-      <div class="meta">${l.id.slice(0, 8)} · ${timeAgo(l.started_at)}</div>`;
+      <div class="cmd">
+        <span class="dot"></span>
+        <span class="loom-label">${label}</span>
+        <button class="rename-btn" title="Rename">✎</button>
+      </div>
+      <div class="meta">${escHtml(l.command)} · ${timeAgo(l.started_at)}</div>`;
     el.addEventListener('click', () => selectLoom(l, el));
+    el.querySelector('.rename-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      const cur = l.name || l.command;
+      const next = prompt('Rename loom:', cur);
+      if (next && next.trim() && next.trim() !== cur) {
+        fetch(`/api/looms/${l.id}`, {
+          method: 'PATCH',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name: next.trim()}),
+        }).then(() => loadLooms());
+      }
+    });
     loomList.appendChild(el);
   });
 }

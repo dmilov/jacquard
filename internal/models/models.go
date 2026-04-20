@@ -22,6 +22,7 @@ type Message struct {
 type LoomInfo struct {
 	ID             string    `json:"id"`
 	ConversationID string    `json:"conversation_id"`
+	Name           string    `json:"name"`
 	Command        string    `json:"command"`
 	Address        string    `json:"address"`
 	StartedAt      time.Time `json:"started_at"`

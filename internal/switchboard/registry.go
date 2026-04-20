@@ -35,6 +35,18 @@ func (r *Registry) Get(id string) (models.LoomInfo, bool) {
 	return l, ok
 }
 
+func (r *Registry) Rename(id, name string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	l, ok := r.looms[id]
+	if !ok {
+		return false
+	}
+	l.Name = name
+	r.looms[id] = l
+	return true
+}
+
 func (r *Registry) List() []models.LoomInfo {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

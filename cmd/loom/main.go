@@ -23,6 +23,7 @@ func main() {
 	switchboardURL := flag.String("switchboard", "http://localhost:1804", "Switchboard URL")
 	nodeID         := flag.String("node", hostname, "Node identifier")
 	dbPath         := flag.String("db", "jacquard.db", "SQLite database file path")
+	name           := flag.String("name", "", "Display name for this loom (defaults to command)")
 	flag.Parse()
 
 	args := flag.Args()
@@ -46,10 +47,14 @@ func main() {
 		log.Fatalf("migrate db: %v", err)
 	}
 
-	convID  := uuid.New().String()
-	loomID  := uuid.New().String()
-	command := strings.Join(args, " ")
-	now     := time.Now().UTC()
+	convID   := uuid.New().String()
+	loomID   := uuid.New().String()
+	command  := strings.Join(args, " ")
+	loomName := *name
+	if loomName == "" {
+		loomName = command
+	}
+	now := time.Now().UTC()
 
 	_, err = db.Exec(
 		`INSERT INTO conversations (id, node_id, command, started_at) VALUES (?, ?, ?, ?)`,
@@ -64,6 +69,7 @@ func main() {
 	info := models.LoomInfo{
 		ID:             loomID,
 		ConversationID: convID,
+		Name:           loomName,
 		Command:        command,
 		StartedAt:      now,
 	}

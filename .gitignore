@@ -4,3 +4,6 @@ dist/
 *.test
 *.out
 vendor/
+*.db
+*.db-shm
+*.db-wal

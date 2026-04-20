@@ -11,10 +11,10 @@ import (
 
 // Run spawns args in a PTY with full terminal passthrough. inputTee receives
 // every byte the user types; outputTee receives every byte the CLI outputs.
-// injectCh delivers messages to write to the PTY as if the user typed them.
-// resizeCh delivers {cols, rows} pairs from browser clients.
+// injectCh delivers complete messages; resizeCh delivers terminal dimensions;
+// termInputCh delivers raw keyboard bytes from the browser terminal.
 // Blocks until the child process exits.
-func Run(args []string, injectCh <-chan string, resizeCh <-chan [2]int, inputTee io.Writer, outputTee io.Writer) error {
+func Run(args []string, injectCh <-chan string, resizeCh <-chan [2]int, termInputCh <-chan []byte, inputTee io.Writer, outputTee io.Writer) error {
 	enableVTOutput() // Windows: ensure ANSI sequences render in parent console
 
 	p, err := gopty.New()
@@ -65,6 +65,18 @@ func Run(args []string, injectCh <-chan string, resizeCh <-chan [2]int, inputTee
 				dst = io.MultiWriter(p, inputTee)
 			}
 			io.Copy(dst, os.Stdin) //nolint:errcheck
+		}()
+	}
+
+	// browser keyboard input → PTY (tee'd to recorder so messages are captured)
+	if termInputCh != nil {
+		go func() {
+			for data := range termInputCh {
+				p.Write(data) //nolint:errcheck
+				if inputTee != nil {
+					inputTee.Write(data) //nolint:errcheck
+				}
+			}
 		}()
 	}
 

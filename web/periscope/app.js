@@ -133,7 +133,7 @@ function connectLive(loomId) {
   liveSocket = new WebSocket(wsUrl);
   liveSocket.binaryType = 'arraybuffer';
 
-  liveSocket.onopen = () => sendResize();
+  liveSocket.onopen = () => { sendResize(); term.focus(); };
   liveSocket.onmessage = e => {
     const data = e.data instanceof ArrayBuffer
       ? new Uint8Array(e.data)
@@ -142,6 +142,13 @@ function connectLive(loomId) {
   };
   liveSocket.onerror = () => term.writeln('\r\n\x1b[31m[connection error]\x1b[0m');
   liveSocket.onclose = () => term.writeln('\r\n\x1b[2m[disconnected]\x1b[0m');
+
+  // Forward keyboard input typed in the browser terminal to the PTY.
+  term.onData(data => {
+    if (liveSocket && liveSocket.readyState === WebSocket.OPEN) {
+      liveSocket.send(new TextEncoder().encode(data));
+    }
+  });
 }
 
 // ── Inject ────────────────────────────────────────────────────────────────────

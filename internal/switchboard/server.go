@@ -165,16 +165,14 @@ func (s *Server) handleProxyWS(w http.ResponseWriter, r *http.Request) {
 	}
 	defer client.Close()
 
-	// Forward text frames client → upstream (resize messages from browser).
+	// Forward all client → upstream frames: text = resize, binary = keyboard input.
 	go func() {
 		for {
 			msgType, data, err := client.ReadMessage()
 			if err != nil {
 				return
 			}
-			if msgType == websocket.TextMessage {
-				upstream.WriteMessage(websocket.TextMessage, data) //nolint:errcheck
-			}
+			upstream.WriteMessage(msgType, data) //nolint:errcheck
 		}
 	}()
 

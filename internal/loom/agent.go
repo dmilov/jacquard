@@ -20,12 +20,13 @@ var wsUpgrader = websocket.Upgrader{
 // Agent runs the Loom's local HTTP server, registers with Switchboard, and
 // exposes WebSocket output streaming and message injection.
 type Agent struct {
-	info        models.LoomInfo
-	switchboard string
-	broadcaster *Broadcaster
-	injectCh    chan string
-	resizeCh    chan [2]int
-	server      *http.Server
+	info         models.LoomInfo
+	switchboard  string
+	broadcaster  *Broadcaster
+	injectCh     chan string
+	resizeCh     chan [2]int
+	termInputCh  chan []byte
+	server       *http.Server
 }
 
 func NewAgent(info models.LoomInfo, switchboardURL string) *Agent {
@@ -35,12 +36,14 @@ func NewAgent(info models.LoomInfo, switchboardURL string) *Agent {
 		broadcaster: NewBroadcaster(),
 		injectCh:    make(chan string, 16),
 		resizeCh:    make(chan [2]int, 4),
+		termInputCh: make(chan []byte, 64),
 	}
 }
 
-func (a *Agent) Broadcaster() *Broadcaster { return a.broadcaster }
-func (a *Agent) InjectCh() <-chan string    { return a.injectCh }
-func (a *Agent) ResizeCh() <-chan [2]int    { return a.resizeCh }
+func (a *Agent) Broadcaster() *Broadcaster  { return a.broadcaster }
+func (a *Agent) InjectCh() <-chan string     { return a.injectCh }
+func (a *Agent) ResizeCh() <-chan [2]int     { return a.resizeCh }
+func (a *Agent) TermInputCh() <-chan []byte  { return a.termInputCh }
 
 // Start binds to a random local port, starts the HTTP server, and registers
 // with the Switchboard.
@@ -68,6 +71,7 @@ func (a *Agent) Shutdown() {
 	a.deregister()
 	close(a.injectCh)
 	close(a.resizeCh)
+	close(a.termInputCh)
 	a.broadcaster.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -116,23 +120,31 @@ func (a *Agent) handleWS(w http.ResponseWriter, r *http.Request) {
 	ch := a.broadcaster.Subscribe()
 	defer a.broadcaster.Unsubscribe(ch)
 
-	// Read resize messages sent by the browser through the switchboard proxy.
+	// Read control and input messages sent by the browser through the proxy.
 	go func() {
 		for {
 			msgType, data, err := conn.ReadMessage()
 			if err != nil {
 				return
 			}
-			if msgType != websocket.TextMessage {
-				continue
-			}
-			var req models.ResizeRequest
-			if err := json.Unmarshal(data, &req); err != nil || req.Cols <= 0 || req.Rows <= 0 {
-				continue
-			}
-			select {
-			case a.resizeCh <- [2]int{req.Cols, req.Rows}:
-			default:
+			switch msgType {
+			case websocket.TextMessage:
+				var req models.ResizeRequest
+				if err := json.Unmarshal(data, &req); err != nil || req.Cols <= 0 || req.Rows <= 0 {
+					continue
+				}
+				select {
+				case a.resizeCh <- [2]int{req.Cols, req.Rows}:
+				default:
+				}
+			case websocket.BinaryMessage:
+				// Keyboard input from the browser terminal.
+				cp := make([]byte, len(data))
+				copy(cp, data)
+				select {
+				case a.termInputCh <- cp:
+				default:
+				}
 			}
 		}
 	}()

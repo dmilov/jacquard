@@ -99,7 +99,7 @@ func main() {
 		}
 	}()
 
-	if err := loom.Run(args, injectCh, agent.ResizeCh(), inputTee, outputTee); err != nil {
+	if err := loom.Run(args, injectCh, agent.ResizeCh(), agent.TermInputCh(), inputTee, outputTee); err != nil {
 		log.Printf("process exited: %v", err)
 	}
 

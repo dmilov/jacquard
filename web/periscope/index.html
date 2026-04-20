@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jacquard · Periscope</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Jacquard</h1>
+    <span>Periscope</span>
+  </header>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-section">Active Looms</div>
+      <div class="loom-list" id="loom-list">
+        <div class="empty">Loading…</div>
+      </div>
+
+      <hr class="sidebar-divider" />
+
+      <div class="sidebar-section">Conversations</div>
+      <div class="conv-list" id="conv-list">
+        <div class="empty">Select a loom or browse below</div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <div class="tabs">
+        <div class="tab active" data-panel="live">Live</div>
+        <div class="tab" data-panel="history">History</div>
+        <div class="tab" data-panel="conversations">All Conversations</div>
+      </div>
+
+      <!-- Live panel -->
+      <div class="panel active" id="panel-live">
+        <div class="output" id="output">Select an active loom from the sidebar to view live output.</div>
+        <div class="inject-bar">
+          <input id="inject-input" type="text" placeholder="Inject a message…" autocomplete="off" />
+          <button id="inject-btn">Send</button>
+        </div>
+      </div>
+
+      <!-- History panel -->
+      <div class="panel" id="panel-history">
+        <div class="history" id="history">
+          <div class="empty">Select a loom or conversation to view history.</div>
+        </div>
+      </div>
+
+      <!-- All conversations panel -->
+      <div class="panel" id="panel-conversations">
+        <div class="history" id="conv-list-main">
+          <div class="empty">Loading…</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

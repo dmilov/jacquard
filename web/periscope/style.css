@@ -1,0 +1,230 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #0f1117;
+  color: #e1e4e8;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  flex-shrink: 0;
+}
+
+header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: 0.05em; color: #58a6ff; }
+header span { font-size: 0.75rem; color: #8b949e; }
+
+.layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  background: #161b22;
+  border-right: 1px solid #30363d;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-section {
+  padding: 10px 14px 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8b949e;
+}
+
+.loom-list, .conv-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.loom-item, .conv-item {
+  padding: 8px 14px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background 0.1s;
+}
+
+.loom-item:hover, .conv-item:hover { background: #1c2128; }
+.loom-item.active, .conv-item.active {
+  background: #1c2128;
+  border-left-color: #58a6ff;
+}
+
+.loom-item .cmd {
+  font-size: 0.8rem;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loom-item .meta, .conv-item .meta {
+  font-size: 0.7rem;
+  color: #8b949e;
+  margin-top: 2px;
+}
+
+.dot {
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #3fb950;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* Main panel */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid #30363d;
+  background: #161b22;
+  flex-shrink: 0;
+}
+
+.tab {
+  padding: 10px 20px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: #8b949e;
+  transition: color 0.1s;
+}
+
+.tab:hover { color: #e1e4e8; }
+.tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+
+.panel { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+.panel.active { display: flex; }
+
+/* Live output */
+.output {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #0d1117;
+}
+
+/* Inject bar */
+.inject-bar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #161b22;
+  border-top: 1px solid #30363d;
+  flex-shrink: 0;
+}
+
+.inject-bar input {
+  flex: 1;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 6px 12px;
+  color: #e1e4e8;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.inject-bar input:focus { border-color: #58a6ff; }
+
+.inject-bar button, .btn {
+  background: #238636;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  color: #fff;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.inject-bar button:hover, .btn:hover { background: #2ea043; }
+
+/* History */
+.history {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.message.user {
+  align-self: flex-end;
+  background: #1f4068;
+  border: 1px solid #2d5986;
+}
+
+.message.assistant {
+  align-self: flex-start;
+  background: #1c2128;
+  border: 1px solid #30363d;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 0.78rem;
+}
+
+.message .role {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8b949e;
+  margin-bottom: 4px;
+}
+
+.empty { color: #8b949e; font-size: 0.85rem; padding: 20px; }
+
+/* Conversations panel */
+.conv-item .cmd {
+  font-size: 0.8rem;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-divider {
+  border: none;
+  border-top: 1px solid #30363d;
+  margin: 4px 0;
+}

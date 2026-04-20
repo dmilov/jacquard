@@ -12,7 +12,7 @@ Named after the [Jacquard loom](https://en.wikipedia.org/wiki/Jacquard_machine) 
 *Per CLI process.* Wraps a Claude or Copilot CLI process in a PTY, providing full transparent terminal passthrough while intercepting I/O. Records the conversation to MySQL and exposes live output over WebSocket. Registers itself with the local Switchboard on startup.
 
 ```
-loom -switchboard http://localhost:8080 -dsn "user:pass@tcp(localhost:3306)/jacquard?parseTime=true" -- agency claude
+loom -switchboard http://localhost:8080 -dsn "user:pass@tcp(localhost:3306)/jacquard?parseTime=true" -- claude
 ```
 
 ### Switchboard
@@ -41,7 +41,7 @@ Browser (Periscope)
     Loom(s)
        │  PTY
        ▼
-  agency claude / copilot CLI
+  claude / copilot CLI
        │
        ▼
   Your terminal (transparent passthrough)
@@ -76,9 +76,9 @@ go build -o bin/switchboard ./cmd/switchboard
 
 **2. Launch a CLI session through Loom** (instead of calling it directly):
 ```bash
-./bin/loom -dsn "user:pass@tcp(localhost:3306)/jacquard?parseTime=true" -- agency claude
+./bin/loom -dsn "user:pass@tcp(localhost:3306)/jacquard?parseTime=true" -- claude
 ```
-The terminal behaves exactly as if you ran `agency claude` directly. Loom is transparent.
+The terminal behaves exactly as if you ran `claude` directly. Loom is transparent.
 
 **3. Open Periscope** at `http://localhost:8080` to observe and interact remotely.
 

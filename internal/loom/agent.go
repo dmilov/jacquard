@@ -120,30 +120,38 @@ func (a *Agent) handleWS(w http.ResponseWriter, r *http.Request) {
 	ch := a.broadcaster.Subscribe()
 	defer a.broadcaster.Unsubscribe(ch)
 
-	// Read control and input messages sent by the browser through the proxy.
+	// Read control messages from the browser. All browser→loom messages are
+	// text JSON with a "type" field to avoid binary frame pump stalls.
 	go func() {
 		for {
-			msgType, data, err := conn.ReadMessage()
+			_, data, err := conn.ReadMessage()
 			if err != nil {
 				return
 			}
-			switch msgType {
-			case websocket.TextMessage:
-				var req models.ResizeRequest
-				if err := json.Unmarshal(data, &req); err != nil || req.Cols <= 0 || req.Rows <= 0 {
-					continue
+			var env struct {
+				Type string `json:"type"`
+				Data string `json:"data"` // keyboard input
+				Cols int    `json:"cols"` // resize
+				Rows int    `json:"rows"` // resize
+			}
+			if err := json.Unmarshal(data, &env); err != nil {
+				continue
+			}
+			switch env.Type {
+			case "resize":
+				if env.Cols > 0 && env.Rows > 0 {
+					select {
+					case a.resizeCh <- [2]int{env.Cols, env.Rows}:
+					default:
+					}
 				}
-				select {
-				case a.resizeCh <- [2]int{req.Cols, req.Rows}:
-				default:
-				}
-			case websocket.BinaryMessage:
-				// Keyboard input from the browser terminal.
-				cp := make([]byte, len(data))
-				copy(cp, data)
-				select {
-				case a.termInputCh <- cp:
-				default:
+			case "input":
+				if env.Data != "" {
+					cp := []byte(env.Data)
+					select {
+					case a.termInputCh <- cp:
+					default:
+					}
 				}
 			}
 		}

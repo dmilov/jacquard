@@ -45,15 +45,24 @@ function initTerminal() {
   term.writeln('\x1b[2m— waiting for loom —\x1b[0m');
 }
 
-function sendResize() {
-  if (liveSocket && liveSocket.readyState === WebSocket.OPEN && term) {
-    liveSocket.send(JSON.stringify({type: 'resize', cols: term.cols, rows: term.rows}));
+function sendWS(msg) {
+  if (liveSocket && liveSocket.readyState === WebSocket.OPEN) {
+    liveSocket.send(JSON.stringify(msg));
   }
+}
+
+function sendResize() {
+  if (term) sendWS({type: 'resize', cols: term.cols, rows: term.rows});
 }
 
 window.addEventListener('resize', () => {
   if (fitAddon) fitAddon.fit();
   sendResize();
+});
+
+// Clicking the terminal container gives it keyboard focus.
+document.getElementById('terminal-container').addEventListener('click', () => {
+  if (term) term.focus();
 });
 
 initTerminal();
@@ -122,6 +131,8 @@ function selectLoom(l, el) {
   panels.forEach(p => p.classList.remove('active'));
   document.querySelector('[data-panel="live"]').classList.add('active');
   document.getElementById('panel-live').classList.add('active');
+  // Focus terminal within the user-gesture stack so browsers allow it.
+  if (term) term.focus();
 }
 
 // ── Live output via xterm.js ──────────────────────────────────────────────────
@@ -133,7 +144,7 @@ function connectLive(loomId) {
   liveSocket = new WebSocket(wsUrl);
   liveSocket.binaryType = 'arraybuffer';
 
-  liveSocket.onopen = () => { sendResize(); term.focus(); };
+  liveSocket.onopen = () => sendResize();
   liveSocket.onmessage = e => {
     const data = e.data instanceof ArrayBuffer
       ? new Uint8Array(e.data)
@@ -144,11 +155,8 @@ function connectLive(loomId) {
   liveSocket.onclose = () => term.writeln('\r\n\x1b[2m[disconnected]\x1b[0m');
 
   // Forward keyboard input typed in the browser terminal to the PTY.
-  term.onData(data => {
-    if (liveSocket && liveSocket.readyState === WebSocket.OPEN) {
-      liveSocket.send(new TextEncoder().encode(data));
-    }
-  });
+  // Sent as a text JSON frame so it goes through the same read pump as resize.
+  term.onData(data => sendWS({type: 'input', data}));
 }
 
 // ── Inject ────────────────────────────────────────────────────────────────────

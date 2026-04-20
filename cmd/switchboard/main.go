@@ -18,7 +18,7 @@ import (
 func main() {
 	hostname, _ := os.Hostname()
 
-	addr   := flag.String("addr", ":8080", "Listen address")
+	addr   := flag.String("addr", ":1804", "Listen address")
 	dbPath := flag.String("db", "jacquard.db", "SQLite database file path")
 	nodeID := flag.String("node", hostname, "Node identifier")
 	flag.Parse()

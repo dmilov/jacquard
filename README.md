@@ -12,7 +12,7 @@ Named after the [Jacquard loom](https://en.wikipedia.org/wiki/Jacquard_machine) 
 *Per CLI process.* Wraps a Claude or Copilot CLI process in a PTY, providing full transparent terminal passthrough while intercepting I/O. Records the conversation to MySQL and exposes live output over WebSocket. Registers itself with the local Switchboard on startup.
 
 ```
-loom -switchboard http://localhost:8080 -db jacquard.db -- claude
+loom -switchboard http://localhost:1804 -db jacquard.db -- claude
 ```
 
 ### Switchboard
@@ -25,7 +25,7 @@ switchboard -addr :8080 -db jacquard.db
 ### Periscope
 *Web client.* Served by Switchboard at `/`. Browse active Loom instances, view live PTY output via WebSocket, inject messages, and search conversation history.
 
-Open `http://localhost:8080` after starting Switchboard.
+Open `http://localhost:1804` after starting Switchboard.
 
 ---
 
@@ -74,7 +74,7 @@ The database file is created automatically on first run. No setup needed.
 ```
 The terminal behaves exactly as if you ran `claude` directly. Loom is transparent.
 
-**3. Open Periscope** at `http://localhost:8080` to observe and interact remotely.
+**3. Open Periscope** at `http://localhost:1804` to observe and interact remotely.
 
 ---
 

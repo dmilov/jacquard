@@ -21,10 +21,10 @@ func main() {
 	hostname, _ := os.Hostname()
 
 	switchboardURL := flag.String("switchboard", "http://localhost:1804", "Switchboard URL")
-	nodeID         := flag.String("node", hostname, "Node identifier")
-	dbPath         := flag.String("db", "jacquard.db", "SQLite database file path")
-	name           := flag.String("name", "", "Display name for this loom (defaults to command)")
-	idFlag         := flag.String("id", "", "Loom ID (generated if empty)")
+	nodeID := flag.String("node", hostname, "Node identifier")
+	dbPath := flag.String("db", "jacquard.db", "SQLite database file path")
+	name := flag.String("name", "", "Display name for this loom (defaults to command)")
+	idFlag := flag.String("id", "", "Loom ID (generated if empty)")
 	flag.Parse()
 
 	args := flag.Args()
@@ -41,15 +41,15 @@ func main() {
 	}
 	defer db.Close()
 
-	db.Exec("PRAGMA journal_mode=WAL")  //nolint:errcheck
-	db.Exec("PRAGMA foreign_keys=ON")   //nolint:errcheck
+	db.Exec("PRAGMA journal_mode=WAL") //nolint:errcheck
+	db.Exec("PRAGMA foreign_keys=ON")  //nolint:errcheck
 
 	if err := store.Migrate(db); err != nil {
 		log.Fatalf("migrate db: %v", err)
 	}
 
-	convID  := uuid.New().String()
-	loomID  := *idFlag
+	convID := uuid.New().String()
+	loomID := *idFlag
 	if loomID == "" {
 		loomID = uuid.New().String()
 	}
@@ -99,7 +99,16 @@ func main() {
 		}
 	}()
 
-	if err := loom.Run(args, injectCh, agent.ResizeCh(), agent.TermInputCh(), inputTee, outputTee); err != nil {
+	resizeCh := make(chan [2]int, 16)
+	go func() {
+		defer close(resizeCh)
+		for dim := range agent.ResizeCh() {
+			recorder.Resize(dim[0], dim[1])
+			resizeCh <- dim
+		}
+	}()
+
+	if err := loom.Run(args, injectCh, resizeCh, agent.TermInputCh(), inputTee, outputTee); err != nil {
 		log.Printf("process exited: %v", err)
 	}
 

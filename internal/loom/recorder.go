@@ -3,28 +3,22 @@ package loom
 import (
 	"context"
 	"database/sql"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
 )
 
-var ansiRe = regexp.MustCompile(`\x1b(?:\[[0-9;]*[A-Za-z]|\][^\x07]*\x07|[()][AB0-9]|.)`)
-
-func stripANSI(s string) string {
-	return strings.TrimSpace(ansiRe.ReplaceAllString(s, ""))
-}
-
 // Recorder reconstructs user/assistant messages from raw PTY streams and
-// persists them to SQLite. Message boundary: everything output between two
-// user Enter presses is saved as one assistant message.
+// persists them to SQLite. Message boundary: terminal output after a user
+// Enter is rendered through a small virtual terminal and saved when the next
+// user Enter arrives.
 type Recorder struct {
 	db             *sql.DB
 	conversationID string
 
 	mu           sync.Mutex
 	inputBuf     []byte
-	outputBuf    strings.Builder
+	outputScreen *terminalCapture
 	sequence     int
 	waitingInput bool
 	escState     int // 0=normal 1=got-ESC 2=in-CSI
@@ -34,6 +28,7 @@ func NewRecorder(db *sql.DB, conversationID string) *Recorder {
 	return &Recorder{
 		db:             db,
 		conversationID: conversationID,
+		outputScreen:   newTerminalCapture(220, 50),
 		waitingInput:   true,
 	}
 }
@@ -77,6 +72,7 @@ func (r *Recorder) WriteInput(b []byte) {
 				r.flushOutput()
 			}
 			r.waitingInput = false
+			r.outputScreen.Reset()
 			r.persist("user", msg)
 		default:
 			if c >= 0x20 {
@@ -91,8 +87,15 @@ func (r *Recorder) WriteOutput(b []byte) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.waitingInput {
-		r.outputBuf.Write(b)
+		r.outputScreen.Write(b)
 	}
+}
+
+// Resize keeps the recorder's virtual terminal close to the real PTY size.
+func (r *Recorder) Resize(cols, rows int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.outputScreen.Resize(cols, rows)
 }
 
 // Flush saves any buffered assistant output — call on process exit.
@@ -105,10 +108,9 @@ func (r *Recorder) Flush() {
 }
 
 func (r *Recorder) flushOutput() {
-	raw := r.outputBuf.String()
-	r.outputBuf.Reset()
+	clean := r.outputScreen.Text()
+	r.outputScreen.Reset()
 	r.waitingInput = true
-	clean := stripANSI(raw)
 	if clean == "" {
 		return
 	}

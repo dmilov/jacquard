@@ -206,6 +206,21 @@ header span { font-size: 0.75rem; color: #8b949e; }
   vertical-align: middle;
 }
 
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(1.4); }
+}
+
+.dot.attention {
+  background: #d29922;
+  animation: pulse-dot 1s ease-in-out infinite;
+}
+
+.loom-item.attention {
+  border-left-color: #d29922 !important;
+  background: #1a1a0f;
+}
+
 /* Main panel */
 .main {
   flex: 1;

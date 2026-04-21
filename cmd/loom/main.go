@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"flag"
 	"io"
 	"log"
@@ -10,11 +9,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	_ "modernc.org/sqlite"
 
 	"github.com/dmilov/jacquard/internal/loom"
 	"github.com/dmilov/jacquard/internal/models"
-	"github.com/dmilov/jacquard/internal/store"
 )
 
 func main() {
@@ -22,10 +19,11 @@ func main() {
 
 	switchboardURL := flag.String("switchboard", "http://localhost:1804", "Switchboard URL")
 	nodeID := flag.String("node", hostname, "Node identifier")
-	dbPath := flag.String("db", "jacquard.db", "SQLite database file path")
 	name := flag.String("name", "", "Display name for this loom (defaults to command)")
 	idFlag := flag.String("id", "", "Loom ID (generated if empty)")
 	flag.Parse()
+
+	_ = nodeID // kept for future use
 
 	args := flag.Args()
 	if len(args) > 0 && args[0] == "--" {
@@ -33,19 +31,6 @@ func main() {
 	}
 	if len(args) == 0 {
 		log.Fatal("usage: loom [flags] -- <command> [args...]")
-	}
-
-	db, err := sql.Open("sqlite", *dbPath)
-	if err != nil {
-		log.Fatalf("open db: %v", err)
-	}
-	defer db.Close()
-
-	db.Exec("PRAGMA journal_mode=WAL") //nolint:errcheck
-	db.Exec("PRAGMA foreign_keys=ON")  //nolint:errcheck
-
-	if err := store.Migrate(db); err != nil {
-		log.Fatalf("migrate db: %v", err)
 	}
 
 	convID := uuid.New().String()
@@ -60,15 +45,7 @@ func main() {
 	}
 	now := time.Now().UTC()
 
-	_, err = db.Exec(
-		`INSERT INTO conversations (id, node_id, command, started_at) VALUES (?, ?, ?, ?)`,
-		convID, *nodeID, command, now,
-	)
-	if err != nil {
-		log.Fatalf("create conversation: %v", err)
-	}
-
-	recorder := loom.NewRecorder(db, convID)
+	recorder := loom.NewRecorder(convID)
 
 	info := models.LoomInfo{
 		ID:             loomID,
@@ -77,11 +54,13 @@ func main() {
 		Command:        command,
 		StartedAt:      now,
 	}
-	agent := loom.NewAgent(info, *switchboardURL)
+	agent := loom.NewAgent(info, *switchboardURL, recorder)
 	if err := agent.Start(); err != nil {
 		log.Printf("warn: switchboard registration failed: %v", err)
 	}
 	defer agent.Shutdown()
+
+	recorder.SetNeedsInputCallback(agent.SetNeedsInput)
 
 	outputTee := io.MultiWriter(
 		writerFunc(recorder.WriteOutput),
@@ -113,7 +92,6 @@ func main() {
 	}
 
 	recorder.Flush()
-	_, _ = db.Exec(`UPDATE conversations SET ended_at=? WHERE id=?`, time.Now().UTC(), convID)
 }
 
 type writerFunc func([]byte)

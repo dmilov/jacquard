@@ -9,6 +9,9 @@ let liveSocket = null;
 let term = null;
 let fitAddon = null;
 
+// Track which looms were already flagged so we only notify on transition.
+const attentionLooms = new Set();
+
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const loomList      = document.getElementById('loom-list');
 const convList      = document.getElementById('conv-list');
@@ -92,15 +95,33 @@ async function loadLooms() {
   loomList.innerHTML = '';
   if (!looms.length) {
     loomList.innerHTML = '<div class="empty">No active looms</div>';
+    attentionLooms.clear();
     return;
   }
+
+  // Fire notification on transition from normal → needs_input.
+  const currentIds = new Set(looms.map(l => l.id));
+  // Remove stale entries for looms that no longer exist.
+  for (const id of attentionLooms) {
+    if (!currentIds.has(id)) attentionLooms.delete(id);
+  }
+
   looms.forEach(l => {
+    if (l.needs_input && !attentionLooms.has(l.id)) {
+      attentionLooms.add(l.id);
+      notifyAttention(l.name || l.command);
+    } else if (!l.needs_input) {
+      attentionLooms.delete(l.id);
+    }
+
     const el = document.createElement('div');
-    el.className = 'loom-item' + (l.id === activeLoomId ? ' active' : '');
+    const attention = l.needs_input ? ' attention' : '';
+    el.className = 'loom-item' + (l.id === activeLoomId ? ' active' : '') + attention;
     const label = escHtml(l.name || l.command);
+    const dotClass = l.needs_input ? 'dot attention' : 'dot';
     el.innerHTML = `
       <div class="cmd">
-        <span class="dot"></span>
+        <span class="${dotClass}"></span>
         <span class="loom-label">${label}</span>
         <button class="rename-btn" title="Rename">✎</button>
         <button class="kill-btn" title="Stop">✕</button>
@@ -237,6 +258,24 @@ async function loadConversations() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function notifyAttention(name) {
+  // Visual: page title badge (works even when tab is in background).
+  document.title = '⚠ ' + name + ' needs input — Jacquard';
+  setTimeout(() => { document.title = 'Jacquard'; }, 8000);
+
+  if (!('Notification' in window)) return;
+  const send = () => new Notification('Jacquard — input needed', {
+    body: name + ' is waiting for your response',
+    icon: '',
+    tag: 'jacquard-attention',
+  });
+  if (Notification.permission === 'granted') {
+    send();
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(p => { if (p === 'granted') send(); });
+  }
+}
+
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }

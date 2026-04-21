@@ -5,6 +5,7 @@ import "time"
 type Conversation struct {
 	ID        string     `json:"id"`
 	NodeID    string     `json:"node_id"`
+	Name      string     `json:"name,omitempty"`
 	Command   string     `json:"command"`
 	StartedAt time.Time  `json:"started_at"`
 	EndedAt   *time.Time `json:"ended_at,omitempty"`
@@ -25,6 +26,7 @@ type LoomInfo struct {
 	Name           string    `json:"name"`
 	Command        string    `json:"command"`
 	Address        string    `json:"address"`
+	NeedsInput     bool      `json:"needs_input,omitempty"`
 	StartedAt      time.Time `json:"started_at"`
 }
 

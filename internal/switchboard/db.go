@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"time"
-
-	"github.com/dmilov/jacquard/internal/models"
 )
 
 type DB struct {
@@ -14,66 +12,47 @@ type DB struct {
 
 func NewDB(db *sql.DB) *DB { return &DB{db: db} }
 
-func (d *DB) SaveConversation(ctx context.Context, conv models.Conversation) error {
+// LaunchedLoom records the parameters needed to re-launch a loom on restart.
+type LaunchedLoom struct {
+	ID        string
+	Name      string
+	Command   string
+	WorkDir   string
+	CreatedAt time.Time
+}
+
+func (d *DB) SaveLaunchedLoom(ctx context.Context, l LaunchedLoom) error {
 	_, err := d.db.ExecContext(ctx,
-		`INSERT OR IGNORE INTO conversations (id, node_id, command, started_at) VALUES (?, ?, ?, ?)`,
-		conv.ID, conv.NodeID, conv.Command, conv.StartedAt,
+		`INSERT OR REPLACE INTO launched_looms (id, name, command, work_dir, created_at)
+		 VALUES (?, ?, ?, ?, ?)`,
+		l.ID, l.Name, l.Command, l.WorkDir, l.CreatedAt,
 	)
 	return err
 }
 
-func (d *DB) EndConversation(ctx context.Context, id string) error {
+func (d *DB) DeleteLaunchedLoom(ctx context.Context, id string) error {
 	_, err := d.db.ExecContext(ctx,
-		`UPDATE conversations SET ended_at=? WHERE id=?`,
-		time.Now().UTC(), id,
+		`DELETE FROM launched_looms WHERE id=?`, id,
 	)
 	return err
 }
 
-func (d *DB) ListConversations(ctx context.Context, nodeID string) ([]models.Conversation, error) {
-	query := `SELECT id, node_id, command, started_at, ended_at
-	          FROM conversations ORDER BY started_at DESC LIMIT 200`
-	args := []any{}
-	if nodeID != "" {
-		query = `SELECT id, node_id, command, started_at, ended_at
-		         FROM conversations WHERE node_id=? ORDER BY started_at DESC LIMIT 200`
-		args = append(args, nodeID)
-	}
-	rows, err := d.db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var convs []models.Conversation
-	for rows.Next() {
-		var c models.Conversation
-		if err := rows.Scan(&c.ID, &c.NodeID, &c.Command, &c.StartedAt, &c.EndedAt); err != nil {
-			return nil, err
-		}
-		convs = append(convs, c)
-	}
-	return convs, rows.Err()
-}
-
-func (d *DB) GetMessages(ctx context.Context, conversationID string) ([]models.Message, error) {
+func (d *DB) ListLaunchedLooms(ctx context.Context) ([]LaunchedLoom, error) {
 	rows, err := d.db.QueryContext(ctx,
-		`SELECT id, conversation_id, role, content, sequence, created_at
-		 FROM messages WHERE conversation_id=? ORDER BY sequence ASC`,
-		conversationID,
+		`SELECT id, name, command, work_dir, created_at FROM launched_looms ORDER BY created_at ASC`,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var msgs []models.Message
+	var looms []LaunchedLoom
 	for rows.Next() {
-		var m models.Message
-		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Sequence, &m.CreatedAt); err != nil {
+		var l LaunchedLoom
+		if err := rows.Scan(&l.ID, &l.Name, &l.Command, &l.WorkDir, &l.CreatedAt); err != nil {
 			return nil, err
 		}
-		msgs = append(msgs, m)
+		looms = append(looms, l)
 	}
-	return msgs, rows.Err()
+	return looms, rows.Err()
 }

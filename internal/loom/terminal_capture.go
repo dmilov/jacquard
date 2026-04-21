@@ -25,6 +25,14 @@ func newTerminalCapture(cols, rows int) *terminalCapture {
 	return t
 }
 
+// CurrentLine returns the text on the line the cursor currently occupies.
+func (t *terminalCapture) CurrentLine() string {
+	if t.row < 0 || t.row >= len(t.lines) {
+		return ""
+	}
+	return trimRightRunes(t.lines[t.row])
+}
+
 func (t *terminalCapture) Reset() {
 	cols, rows := t.cols, t.rows
 	*t = terminalCapture{}

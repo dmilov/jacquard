@@ -17,21 +17,17 @@ var wsUpgrader = websocket.Upgrader{
 
 type Server struct {
 	registry       *Registry
-	db             *DB
 	nodeID         string
 	launcher       *Launcher
 	switchboardURL string
-	dbPath         string
 }
 
-func NewServer(registry *Registry, db *DB, nodeID, switchboardURL, dbPath string, launcher *Launcher) *Server {
+func NewServer(registry *Registry, nodeID, switchboardURL string, launcher *Launcher) *Server {
 	return &Server{
 		registry:       registry,
-		db:             db,
 		nodeID:         nodeID,
 		launcher:       launcher,
 		switchboardURL: switchboardURL,
-		dbPath:         dbPath,
 	}
 }
 
@@ -106,7 +102,7 @@ func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
 		name = req.Command
 	}
 	loomID := uuid.New().String()
-	if err := s.launcher.Launch(loomID, s.switchboardURL, name, s.dbPath, req.WorkDir, args); err != nil {
+	if err := s.launcher.Launch(loomID, s.switchboardURL, name, req.WorkDir, args); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -202,26 +198,33 @@ func (s *Server) handleProxyWS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListConversations(w http.ResponseWriter, r *http.Request) {
-	nodeID := r.URL.Query().Get("node_id")
-	convs, err := s.db.ListConversations(r.Context(), nodeID)
-	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
-		return
-	}
-	if convs == nil {
-		convs = []models.Conversation{}
+	looms := s.registry.List()
+	convs := make([]models.Conversation, 0, len(looms))
+	for _, l := range looms {
+		convs = append(convs, models.Conversation{
+			ID:        l.ConversationID,
+			NodeID:    s.nodeID,
+			Name:      l.Name,
+			Command:   l.Command,
+			StartedAt: l.StartedAt,
+		})
 	}
 	writeJSON(w, convs)
 }
 
 func (s *Server) handleGetMessages(w http.ResponseWriter, r *http.Request) {
-	msgs, err := s.db.GetMessages(r.Context(), r.PathValue("id"))
-	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+	convID := r.PathValue("id")
+	l, ok := s.registry.FindByConversationID(convID)
+	if !ok {
+		writeJSON(w, []models.Message{})
 		return
 	}
-	if msgs == nil {
-		msgs = []models.Message{}
+	resp, err := http.Get(l.Address + "/messages")
+	if err != nil {
+		writeJSON(w, []models.Message{})
+		return
 	}
-	writeJSON(w, msgs)
+	defer resp.Body.Close()
+	w.Header().Set("Content-Type", "application/json")
+	io.Copy(w, resp.Body) //nolint:errcheck
 }

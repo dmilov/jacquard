@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/dmilov/jacquard/internal/models"
@@ -23,17 +24,22 @@ type Agent struct {
 	info         models.LoomInfo
 	switchboard  string
 	broadcaster  *Broadcaster
+	recorder     *Recorder
 	injectCh     chan string
 	resizeCh     chan [2]int
 	termInputCh  chan []byte
 	server       *http.Server
+
+	needsInputMu sync.RWMutex
+	needsInput   bool
 }
 
-func NewAgent(info models.LoomInfo, switchboardURL string) *Agent {
+func NewAgent(info models.LoomInfo, switchboardURL string, recorder *Recorder) *Agent {
 	return &Agent{
 		info:        info,
 		switchboard: switchboardURL,
 		broadcaster: NewBroadcaster(),
+		recorder:    recorder,
 		injectCh:    make(chan string, 16),
 		resizeCh:    make(chan [2]int, 4),
 		termInputCh: make(chan []byte, 64),
@@ -44,6 +50,14 @@ func (a *Agent) Broadcaster() *Broadcaster  { return a.broadcaster }
 func (a *Agent) InjectCh() <-chan string     { return a.injectCh }
 func (a *Agent) ResizeCh() <-chan [2]int     { return a.resizeCh }
 func (a *Agent) TermInputCh() <-chan []byte  { return a.termInputCh }
+
+// SetNeedsInput records whether the loom's CLI is waiting for user input.
+// Called by the Recorder when it detects a prompt in the PTY output.
+func (a *Agent) SetNeedsInput(v bool) {
+	a.needsInputMu.Lock()
+	a.needsInput = v
+	a.needsInputMu.Unlock()
+}
 
 // Start binds to a random local port, starts the HTTP server, and registers
 // with the Switchboard.
@@ -56,7 +70,19 @@ func (a *Agent) Start() error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
+		a.needsInputMu.RLock()
+		ni := a.needsInput
+		a.needsInputMu.RUnlock()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]bool{"ok": true, "needs_input": ni}) //nolint:errcheck
+	})
+	mux.HandleFunc("GET /messages", func(w http.ResponseWriter, _ *http.Request) {
+		msgs := a.recorder.Messages()
+		if msgs == nil {
+			msgs = []models.Message{}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(msgs) //nolint:errcheck
 	})
 	mux.HandleFunc("POST /inject", a.handleInject)
 	mux.HandleFunc("GET /ws", a.handleWS)

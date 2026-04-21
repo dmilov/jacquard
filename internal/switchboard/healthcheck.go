@@ -1,6 +1,7 @@
 package switchboard
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 )
@@ -15,9 +16,17 @@ func StartHealthChecker(registry *Registry) {
 		defer t.Stop()
 		for range t.C {
 			for _, loom := range registry.List() {
-				if _, err := client.Get(loom.Address + "/health"); err != nil {
+				resp, err := client.Get(loom.Address + "/health")
+				if err != nil {
 					registry.Deregister(loom.ID)
+					continue
 				}
+				var body struct {
+					NeedsInput bool `json:"needs_input"`
+				}
+				json.NewDecoder(resp.Body).Decode(&body) //nolint:errcheck
+				resp.Body.Close()
+				registry.SetNeedsInput(loom.ID, body.NeedsInput)
 			}
 		}
 	}()

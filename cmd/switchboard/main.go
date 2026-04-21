@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"flag"
 	"fmt"
@@ -45,11 +46,25 @@ func main() {
 	}
 	switchboardURL := fmt.Sprintf("http://%s", host)
 
-	registry := switchboard.NewRegistry()
 	sdb      := switchboard.NewDB(db)
-	launcher := switchboard.NewLauncher()
-	server   := switchboard.NewServer(registry, sdb, *nodeID, switchboardURL, *dbPath, launcher)
+	registry := switchboard.NewRegistry()
+	launcher := switchboard.NewLauncher(sdb)
+	server   := switchboard.NewServer(registry, *nodeID, switchboardURL, launcher)
 	switchboard.StartHealthChecker(registry)
+
+	// Re-launch any looms that were running before this switchboard restarted.
+	if prev, err := sdb.ListLaunchedLooms(context.Background()); err != nil {
+		log.Printf("warn: list launched looms: %v", err)
+	} else {
+		for _, l := range prev {
+			args := strings.Fields(l.Command)
+			if err := launcher.Launch(l.ID, switchboardURL, l.Name, l.WorkDir, args); err != nil {
+				log.Printf("warn: relaunch %q: %v", l.Name, err)
+			} else {
+				log.Printf("relaunched loom %q (%s)", l.Name, l.ID)
+			}
+		}
+	}
 
 	subFS, err := fs.Sub(jweb.FS, "periscope")
 	if err != nil {
